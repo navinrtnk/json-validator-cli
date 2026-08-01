@@ -1,0 +1,8 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/JsonValidator.Cli/JsonValidator.Cli.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/JsonValidator.Cli.Tests/JsonValidator.Cli.Tests.csproj" />
+  </Folder>
+</Solution>
