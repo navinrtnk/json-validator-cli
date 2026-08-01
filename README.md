@@ -26,6 +26,63 @@ dotnet run --project src/JsonValidator.Cli -- data.json \
 
 The process exits with `0` when every input is valid, `1` for invalid JSON, and `2` for bad usage or an unreadable input. Add `--quiet` for CI checks that print errors only.
 
+### Example output
+
+Valid input is easy to spot:
+
+```console
+$ json-validator person.json
+person.json: valid
+```
+
+Invalid input includes a one-based line and byte position:
+
+```console
+$ json-validator broken.json
+broken.json:4:12: '}' is invalid after a value. Expected either ',', '}', or ']'.
+```
+
+### JSON Schema validation
+
+Use `--schema` to check required fields, types, and other JSON Schema constraints in addition to JSON syntax:
+
+```bash
+dotnet run --project src/JsonValidator.Cli -- person.json --schema person.schema.json
+```
+
+For example, this schema requires a string-valued `name` property:
+
+```json
+{
+  "type": "object",
+  "required": ["name"],
+  "properties": {
+    "name": { "type": "string" }
+  }
+}
+```
+
+### Machine-readable output
+
+Add `--json-output` when another program or CI pipeline needs to consume the result:
+
+```console
+$ json-validator broken.json --json-output
+{
+  "file": "broken.json",
+  "valid": false,
+  "line": 4,
+  "bytePosition": 12,
+  "message": "'}' is invalid after a value. Expected either ',', '}', or ']'."
+}
+```
+
+When validating multiple files, the output is a JSON array. Schema failures also include a `schemaErrors` array with the instance path and constraint message.
+
+## Continuous integration
+
+The included GitHub Actions workflow restores, builds, and tests the solution on every push and pull request.
+
 ## HTTP API
 
 ```bash

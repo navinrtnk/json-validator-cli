@@ -26,16 +26,60 @@ public static class Program
         var allowComments = args.Contains("--allow-comments");
         var allowTrailingCommas = args.Contains("--allow-trailing-commas");
         var quiet = args.Contains("--quiet") || args.Contains("-q");
-        var inputs = args.Where(a => !a.StartsWith('-') || a == "-").ToArray();
+        var jsonOutput = args.Contains("--json-output");
+        string? schemaPath = null;
+        var inputs = new List<string>();
 
-        if (inputs.Length == 0)
+        for (var index = 0; index < args.Length; index++)
+        {
+            var argument = args[index];
+            if (argument == "--schema")
+            {
+                if (++index >= args.Length)
+                {
+                    Console.Error.WriteLine("Error: --schema requires a file path.");
+                    return ExitCodes.UsageError;
+                }
+                schemaPath = args[index];
+            }
+            else if (argument is "--allow-comments" or "--allow-trailing-commas" or "--json-output" or "--quiet" or "-q")
+            {
+                continue;
+            }
+            else if (argument.StartsWith('-') && argument != "-")
+            {
+                Console.Error.WriteLine($"Error: unknown option '{argument}'.");
+                return ExitCodes.UsageError;
+            }
+            else
+            {
+                inputs.Add(argument);
+            }
+        }
+
+        if (inputs.Count == 0)
         {
             Console.Error.WriteLine("Error: provide at least one JSON file, or '-' to read stdin.");
             return ExitCodes.UsageError;
         }
 
+        string? schemaJson = null;
+        if (schemaPath is not null)
+        {
+            try
+            {
+                schemaJson = await File.ReadAllTextAsync(schemaPath);
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                Console.Error.WriteLine($"{schemaPath}: error: {ex.Message}");
+                return ExitCodes.UsageError;
+            }
+        }
+
         var options = new JsonValidationOptions(allowComments, allowTrailingCommas);
         var exitCode = ExitCodes.Success;
+        var output = new List<object>();
 
         foreach (var input in inputs)
         {
@@ -53,18 +97,48 @@ public static class Program
                 continue;
             }
 
-            var result = JsonValidator.Validate(json, options);
+            var result = schemaJson is null
+                ? JsonValidator.Validate(json, options)
+                : JsonValidator.ValidateAgainstSchema(json, schemaJson, options);
             var label = input == "-" ? "stdin" : input;
+
+            if (jsonOutput)
+            {
+                output.Add(new
+                {
+                    file = label,
+                    valid = result.IsValid,
+                    line = result.LineNumber,
+                    bytePosition = result.BytePositionInLine,
+                    message = result.Error,
+                    schemaErrors = result.SchemaErrors
+                });
+            }
 
             if (result.IsValid)
             {
-                if (!quiet) Console.WriteLine($"{label}: valid");
+                if (!quiet && !jsonOutput) Console.WriteLine($"{label}: valid");
             }
             else
             {
-                Console.Error.WriteLine($"{label}:{result.LineNumber}:{result.BytePositionInLine}: {result.Error}");
+                if (!jsonOutput)
+                {
+                    Console.Error.WriteLine($"{label}:{result.LineNumber}:{result.BytePositionInLine}: {result.Error}");
+                    foreach (var violation in result.SchemaErrors ?? [])
+                        Console.Error.WriteLine($"  {violation.Path}: {violation.Message}");
+                }
                 if (exitCode != ExitCodes.UsageError) exitCode = ExitCodes.InvalidJson;
             }
+        }
+
+        if (jsonOutput)
+        {
+            var value = output.Count == 1 ? output[0] : output;
+            Console.WriteLine(JsonSerializer.Serialize(value, new JsonSerializerOptions
+            {
+                WriteIndented = true,
+                DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull
+            }));
         }
 
         return exitCode;
@@ -113,6 +187,8 @@ public static class Program
         Options:
           --allow-comments          Permit // and /* */ comments
           --allow-trailing-commas   Permit a comma before ] or }
+          --schema <file>           Validate against a JSON Schema
+          --json-output             Emit a machine-readable JSON result
           -q, --quiet               Print only errors
           -h, --help                Show this help
 

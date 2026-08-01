@@ -50,4 +50,25 @@ public class JsonValidatorTests
         Assert.Equal(2, result.LineNumber);
         Assert.NotNull(result.BytePositionInLine);
     }
+
+    [Fact]
+    public void ValidateAgainstSchema_AcceptsMatchingDocument()
+    {
+        const string schema = """{"type":"object","required":["name"],"properties":{"name":{"type":"string"}}}""";
+
+        var result = Validator.ValidateAgainstSchema("{\"name\":\"Ada\"}", schema);
+
+        Assert.True(result.IsValid);
+    }
+
+    [Fact]
+    public void ValidateAgainstSchema_ReportsViolations()
+    {
+        const string schema = """{"type":"object","required":["name"],"properties":{"name":{"type":"string"}}}""";
+
+        var result = Validator.ValidateAgainstSchema("{\"name\":42}", schema);
+
+        Assert.False(result.IsValid);
+        Assert.NotEmpty(result.SchemaErrors!);
+    }
 }
