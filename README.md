@@ -1,5 +1,7 @@
 # JSON Validator CLI
 
+[![CI](https://github.com/navinrtnk/json-validator-cli/actions/workflows/ci.yml/badge.svg)](https://github.com/navinrtnk/json-validator-cli/actions/workflows/ci.yml)
+
 A dependency-light JSON syntax validator built with C#, .NET 10, and ASP.NET Core. Use it as a command-line tool in scripts and CI, or run it as a small HTTP service.
 
 ## Build and test
